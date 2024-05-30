@@ -22,7 +22,7 @@ fn build_ui(app: &Application) {
         .valign(Align::Center)
         .margin_start(12)
         .margin_end(12)
-        .label("1")
+        .label("5")
         .build();
 
     let progress = ProgressBar::builder()
@@ -45,6 +45,7 @@ fn build_ui(app: &Application) {
 
     let spin_button = SpinButton::builder()
         .adjustment(&adjustment)
+        .value(5.0)
         .margin_top(12)
         .margin_bottom(12)
         .halign(Align::Center)
@@ -63,9 +64,22 @@ fn build_ui(app: &Application) {
         .margin_end(12)
         .build();
 
+    // Update label with spin button
+    let label = time_left_label.clone();
     let paused = Cell::new(false);
 
+    spin_button.connect_value_changed(move |sb| {
+        let value = sb.value() as u32;
+        label.set_text(&format!("{}", value));
+    });
+
+    // Lock SpinButton when timer is on
+    let spin_button_clone = spin_button.clone();
+
     start_button.connect_clicked(move |button| {
+        let sensitive = spin_button_clone.get_sensitive();
+        spin_button_clone.set_sensitive(!sensitive);
+
         if !paused.get() {
             button.set_label("Stop the timer");
             paused.set(true);
@@ -75,14 +89,12 @@ fn build_ui(app: &Application) {
         };
     });
 
-    // Apply css to label
-
     // Append widgets
     main_box.append(&time_left_label);
     main_box.append(&progress);
     main_box.append(&spin_button);
     main_box.append(&start_button);
-    main_box.set_valign(Align::End);
+    main_box.set_valign(Align::Center);
 
     // Apply Css
     time_left_label.add_css_class("time-left");
