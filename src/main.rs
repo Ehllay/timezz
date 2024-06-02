@@ -1,12 +1,15 @@
-use std::cell::Cell;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 use gtk::gdk::Display;
 
 use gtk::prelude::*;
 use gtk::{
-    glib, Adjustment, Align, Application, ApplicationWindow, Box as GtkBox, Button, CssProvider,
-    Label, Orientation, ProgressBar, SpinButton,
+    gio, glib, Adjustment, Align, Application, ApplicationWindow, Box as GtkBox, Button,
+    CssProvider, Label, Orientation, ProgressBar, SpinButton,
 };
+use notify_rust::Notification;
 
 const APP_ID: &str = "org.gtk_rs.TimeZZ";
 
@@ -66,26 +69,49 @@ fn build_ui(app: &Application) {
 
     // Update label with spin button
     let label = time_left_label.clone();
-    let paused = Cell::new(false);
+    let is_paused = Arc::new(Mutex::new(false));
+    let is_paused_clone = is_paused.clone();
 
     spin_button.connect_value_changed(move |sb| {
         let value = sb.value() as u32;
         label.set_text(&format!("{}", value));
     });
 
-    // Lock SpinButton when timer is on
     let spin_button_clone = spin_button.clone();
 
     start_button.connect_clicked(move |button| {
+        let mut paused = is_paused_clone.lock().unwrap();
+        // Lock SpinButton when timer is on
         let sensitive = spin_button_clone.get_sensitive();
         spin_button_clone.set_sensitive(!sensitive);
 
-        if !paused.get() {
+        if !*paused {
+            *paused = true;
             button.set_label("Stop the timer");
-            paused.set(true);
+
+            let is_paused_clone_2 = is_paused_clone.clone();
+
+            gio::spawn_blocking(move || {
+                let duration = 5;
+                for _ in (1..=duration).rev() {
+                    if !*is_paused_clone_2.lock().unwrap() {
+                        break;
+                    }
+                    thread::sleep(Duration::from_secs(1));
+                }
+                let mut paused = is_paused_clone_2.lock().unwrap();
+                *paused = false;
+
+                Notification::new()
+                    .summary("Timer has stopped!")
+                    .body("Good job! Do you want to start it again?")
+                    .icon("alarm-symbolic")
+                    .show()
+                    .unwrap();
+            });
         } else {
+            *paused = false;
             button.set_label("Start the timer!");
-            paused.set(false);
         };
     });
 
