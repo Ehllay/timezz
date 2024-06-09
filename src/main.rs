@@ -85,6 +85,7 @@ fn build_ui(app: &Application) {
         glib::spawn_future_local(
             clone!(@weak button, @weak spin_button, @weak progress, @weak label => async move {
                 button.set_label("Stop the timer");
+                spin_button.set_sensitive(false);
 
                 let duration = spin_button.value_as_int() * 60;
                 for t in (1..=duration).rev() {
@@ -94,6 +95,7 @@ fn build_ui(app: &Application) {
                 }
 
                 button.set_label("Start the timer!");
+                spin_button.set_sensitive(true);
                 progress.set_fraction(1.0);
                 label.set_text(&format!("{}", duration/60));
 
