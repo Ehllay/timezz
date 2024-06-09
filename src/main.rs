@@ -1,7 +1,7 @@
-use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use glib::clone;
 use gtk::gdk::Display;
 
 use gtk::prelude::*;
@@ -69,51 +69,48 @@ fn build_ui(app: &Application) {
 
     // Update label with spin button
     let label = time_left_label.clone();
-    let is_paused = Arc::new(Mutex::new(false));
-    let is_paused_clone = is_paused.clone();
 
     spin_button.connect_value_changed(move |sb| {
         let value = sb.value() as u32;
         label.set_text(&format!("{}", value));
     });
 
-    let spin_button_clone = spin_button.clone();
+    let (sender, receiver) = async_channel::bounded(1);
 
-    start_button.connect_clicked(move |button| {
-        let mut paused = is_paused_clone.lock().unwrap();
-        // Lock SpinButton when timer is on
-        let sensitive = spin_button_clone.get_sensitive();
-        spin_button_clone.set_sensitive(!sensitive);
+    start_button.connect_clicked(move |_| {
+        let sender = sender.clone();
 
-        if !*paused {
-            *paused = true;
-            button.set_label("Stop the timer");
+        gio::spawn_blocking(move || {
+            sender
+                .send_blocking(false)
+                .expect("Channel needs to be open");
+            let duration = 5;
+            for _ in (1..=duration).rev() {
+                thread::sleep(Duration::from_secs(1));
+            }
+            sender
+                .send_blocking(true)
+                .expect("The channel needs to be open");
 
-            let is_paused_clone_2 = is_paused_clone.clone();
-
-            gio::spawn_blocking(move || {
-                let duration = 5;
-                for _ in (1..=duration).rev() {
-                    if !*is_paused_clone_2.lock().unwrap() {
-                        break;
-                    }
-                    thread::sleep(Duration::from_secs(1));
-                }
-                let mut paused = is_paused_clone_2.lock().unwrap();
-                *paused = false;
-
-                Notification::new()
-                    .summary("Timer has stopped!")
-                    .body("Good job! Do you want to start it again?")
-                    .icon("alarm-symbolic")
-                    .show()
-                    .unwrap();
-            });
-        } else {
-            *paused = false;
-            button.set_label("Start the timer!");
-        };
+            Notification::new()
+                .summary("Timer has stopped!")
+                .body("Good job! Do you want to start it again?")
+                .icon("alarm-symbolic")
+                .show()
+                .unwrap();
+        });
     });
+
+    glib::spawn_future_local(clone!(@weak spin_button, @weak start_button => async move {
+        while let Ok(enable_button) = receiver.recv().await {
+            spin_button.set_sensitive(enable_button);
+            if enable_button {
+                start_button.set_label("Start the timer!")
+            } else {
+                start_button.set_label("Stop the timer")
+            }
+        }
+    }));
 
     // Append widgets
     main_box.append(&time_left_label);
