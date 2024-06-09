@@ -1,13 +1,10 @@
-use std::thread;
-use std::time::Duration;
-
 use glib::clone;
 use gtk::gdk::Display;
 
 use gtk::prelude::*;
 use gtk::{
-    gio, glib, Adjustment, Align, Application, ApplicationWindow, Box as GtkBox, Button,
-    CssProvider, Label, Orientation, ProgressBar, SpinButton,
+    glib, Adjustment, Align, Application, ApplicationWindow, Box as GtkBox, Button, CssProvider,
+    Label, Orientation, ProgressBar, SpinButton,
 };
 use notify_rust::Notification;
 
@@ -75,42 +72,40 @@ fn build_ui(app: &Application) {
         label.set_text(&format!("{}", value));
     });
 
-    let (sender, receiver) = async_channel::bounded(1);
+    // Clones
+    let spin_button_clone = spin_button.clone();
+    let progress_clone = progress.clone();
+    let time_left_label_clone = time_left_label.clone();
 
-    start_button.connect_clicked(move |_| {
-        let sender = sender.clone();
+    start_button.connect_clicked(move |button| {
+        let spin_button = spin_button_clone.clone();
+        let progress = progress_clone.clone();
+        let label = time_left_label_clone.clone();
 
-        gio::spawn_blocking(move || {
-            sender
-                .send_blocking(false)
-                .expect("Channel needs to be open");
-            let duration = 5;
-            for _ in (1..=duration).rev() {
-                thread::sleep(Duration::from_secs(1));
-            }
-            sender
-                .send_blocking(true)
-                .expect("The channel needs to be open");
+        glib::spawn_future_local(
+            clone!(@weak button, @weak spin_button, @weak progress, @weak label => async move {
+                button.set_label("Stop the timer");
 
-            Notification::new()
-                .summary("Timer has stopped!")
-                .body("Good job! Do you want to start it again?")
-                .icon("alarm-symbolic")
-                .show()
-                .unwrap();
-        });
+                let duration = spin_button.value_as_int() * 60;
+                for t in (1..=duration).rev() {
+                    progress.set_fraction(t as f64 / duration as f64);
+                    label.set_text(&format!("{}", (t+59)/60));
+                    glib::timeout_future_seconds(1).await;
+                }
+
+                button.set_label("Start the timer!");
+                progress.set_fraction(1.0);
+                label.set_text(&format!("{}", duration/60));
+
+                Notification::new()
+                    .summary("Timer has stopped!")
+                    .body("Good job! Do you want to start it again?")
+                    .icon("alarm-symbolic")
+                    .show()
+                    .unwrap();
+            }),
+        );
     });
-
-    glib::spawn_future_local(clone!(@weak spin_button, @weak start_button => async move {
-        while let Ok(enable_button) = receiver.recv().await {
-            spin_button.set_sensitive(enable_button);
-            if enable_button {
-                start_button.set_label("Start the timer!")
-            } else {
-                start_button.set_label("Stop the timer")
-            }
-        }
-    }));
 
     // Append widgets
     main_box.append(&time_left_label);
