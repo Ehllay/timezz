@@ -1,5 +1,5 @@
 # timezz
-A minimal GTK4 application written in rust for creating productivity sessions, inspired by Windows' focus sessions.
+A minimal GTK4 application written in Rust for creating productivity sessions, inspired by Windows' focus sessions.
 
 # Features
 - Timer from 5 to 300 minutes

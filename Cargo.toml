@@ -1,6 +1,14 @@
 [package]
 name = "timezz"
 version = "0.1.0"
+authors = ["Ehllay"]
+license = "GPL-3.0"
+description = "A minimal GTK4 application written in Rust for creating productivity sessions, inspired by Windows' focus sessions."
+readme = "README.md"
+repository = "https://github.com/Ehllay/timezz"
+homepage = "https://github.com/Ehllay/timezz"
+keywords = ["productivity", "time", "utility", "gtk", "linux", "wayland"]
+categories = ["date-and-time", "gui"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
