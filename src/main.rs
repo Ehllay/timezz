@@ -77,8 +77,6 @@ fn build_ui(app: &Application) {
     let progress_clone = progress.clone();
     let time_left_label_clone = time_left_label.clone();
 
-    // Paused state
-
     start_button.connect_toggled(move |button| {
         let spin_button = spin_button_clone.clone();
         let progress = progress_clone.clone();
