@@ -3,8 +3,8 @@ use gtk::gdk::Display;
 
 use gtk::prelude::*;
 use gtk::{
-    glib, Adjustment, Align, Application, ApplicationWindow, Box as GtkBox, Button, CssProvider,
-    Label, Orientation, ProgressBar, SpinButton,
+    glib, Adjustment, Align, Application, ApplicationWindow, Box as GtkBox, CssProvider, Label,
+    Orientation, ProgressBar, SpinButton, ToggleButton,
 };
 use notify_rust::Notification;
 
@@ -54,7 +54,7 @@ fn build_ui(app: &Application) {
         .margin_end(12)
         .build();
 
-    let start_button = Button::builder()
+    let start_button = ToggleButton::builder()
         .label("Start the timer!")
         .margin_top(12)
         .margin_bottom(12)
@@ -77,36 +77,46 @@ fn build_ui(app: &Application) {
     let progress_clone = progress.clone();
     let time_left_label_clone = time_left_label.clone();
 
-    start_button.connect_clicked(move |button| {
+    // Paused state
+
+    start_button.connect_toggled(move |button| {
         let spin_button = spin_button_clone.clone();
         let progress = progress_clone.clone();
         let label = time_left_label_clone.clone();
+        if button.is_active() {
+            glib::spawn_future_local(
+                clone!(@weak button, @weak spin_button, @weak progress, @weak label => async move {
+                    button.set_label("Stop the timer");
+                    spin_button.set_sensitive(false);
 
-        glib::spawn_future_local(
-            clone!(@weak button, @weak spin_button, @weak progress, @weak label => async move {
-                button.set_label("Stop the timer");
-                spin_button.set_sensitive(false);
+                    let duration = spin_button.value_as_int() * 60;
+                    for t in (1..=duration).rev() {
+                        if !button.is_active() {
+                            break;
+                        }
+                        progress.set_fraction(t as f64 / duration as f64);
+                        label.set_text(&format!("{}", (t+59)/60));
+                        glib::timeout_future_seconds(1).await;
+                    }
 
-                let duration = spin_button.value_as_int() * 60;
-                for t in (1..=duration).rev() {
-                    progress.set_fraction(t as f64 / duration as f64);
-                    label.set_text(&format!("{}", (t+59)/60));
-                    glib::timeout_future_seconds(1).await;
-                }
+                    if button.is_active() {
+                        Notification::new()
+                            .summary("Timer has stopped!")
+                            .body("Good job! Do you want to start it again?")
+                            .icon("alarm-symbolic")
+                            .show()
+                            .unwrap();
+                    }
 
-                button.set_label("Start the timer!");
-                spin_button.set_sensitive(true);
-                progress.set_fraction(1.0);
-                label.set_text(&format!("{}", duration/60));
-
-                Notification::new()
-                    .summary("Timer has stopped!")
-                    .body("Good job! Do you want to start it again?")
-                    .icon("alarm-symbolic")
-                    .show()
-                    .unwrap();
-            }),
-        );
+                    button.set_active(false);
+                }),
+            );
+        } else {
+            button.set_label("Start the timer!");
+            spin_button.set_sensitive(true);
+            progress.set_fraction(1.0);
+            label.set_text(&format!("{}", spin_button.value()));
+        }
     });
 
     // Append widgets
