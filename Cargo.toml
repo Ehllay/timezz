@@ -7,7 +7,7 @@ description = "A minimal GTK4 application written in Rust for creating productiv
 readme = "README.md"
 repository = "https://github.com/Ehllay/timezz"
 homepage = "https://github.com/Ehllay/timezz"
-keywords = ["productivity", "time", "utility", "gtk", "linux", "wayland"]
+keywords = ["productivity", "time", "utility", "gtk", "linux"]
 categories = ["date-and-time", "gui"]
 edition = "2021"
 
